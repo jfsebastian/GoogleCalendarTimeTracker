@@ -87,7 +87,7 @@
       }
     );
 
-    var response='<table width="100%" style="font-size:10px"><tr style="background: #e8eef7"><th>Tag</th><th>Hours</th><th>%</th></tr>';
+    var response='<table width="100%" style="font-size:10px"><tr style="background: #e8eef7"><th>Date</th><th>Hours</th><th>%</th></tr>';
     for(var key in dates){
         response+="<tr><td>"+key+'</td><td align="right">'+millisecondsToHours(dates[key])+'</td><td align="right">'+Math.round(100*dates[key]/totalTime)+"%</td></tr>"
     }
