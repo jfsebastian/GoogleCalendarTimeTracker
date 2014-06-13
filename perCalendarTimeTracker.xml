@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Module>
+  <ModulePrefs 
+     title="Total Time Tracker"
+     description="Time Tracker"
+     height="40"
+     author="J.F.Sebastian"
+     author_email="ferrer.jorge@gmail.com">
+    <Require feature="dynamic-height"/>
+    <Require feature="google.calendar-0.5"/>
+    <Require feature="google.calendar-0.5.read"/>
+  </ModulePrefs>
+  <Content type="html">
+  <![CDATA[
+<div id='main'>Loading...</div>
+
+<script>
+  //Simple format for time objects
+  function millisecondsToHours(time){
+        //return Math.round(a/1E3/60/30)/2
+            var milliseconds = parseInt((time%1000)/100)
+            , seconds = parseInt((time/1000)%60)
+            , minutes = parseInt((time/(1000*60))%60)
+            , hours = parseInt((time/(1000*60*60)));
+        hours = (hours < 10) ? "0" + hours : hours;
+        minutes = (minutes < 10) ? "0" + minutes : minutes;
+        seconds = (seconds < 10) ? "0" + seconds : seconds;
+        //return hours + ":" + minutes + ":" + seconds + "." + milliseconds;
+        return hours + ":" + minutes;
+  }
+
+  //Simple format for dates
+  function getReadableDate(dateElements){
+    dayString = (dateElements.day < 10) ? "0" + dateElements.day : dateElements.day;
+    monthString = (dateElements.month < 10) ? "0" + dateElements.month : dateElements.month;
+    return dayString+'/'+monthString+'/'+dateElements.year;
+  }
+
+  //extract simple object for the calendarTime date details
+  function getDateElements(calendarTime){
+    return {
+        year: calendarTime.year,
+        month: calendarTime.month,
+        day: calendarTime.date,
+    };
+  }
+  
+  function rangeToJs(range){
+    return{
+      startTime:google.calendar.utils.toDate(range.startTime),
+      endTime:google.calendar.utils.toDate(range.endTime)
+    }
+  }
+  function rangeDuration(range){
+    return range.endTime-range.startTime
+  }
+
+  function rangeIntersection(a,b){
+    return{
+      startTime:a.startTime>b.startTime?a.startTime:b.startTime,
+      endTime:a.endTime<b.endTime?a.endTime:b.endTime
+    }
+  }
+
+  var prefs=new gadgets.Prefs;
+  var visibleDatesJs;
+  
+  
+  function drawGadget(events){
+    var dates=[],
+        totalTime={'total':0};
+
+    events.forEach(
+      function(response){
+        response.events.forEach(function(event){
+          if(!event.allDay){
+            var duration=rangeDuration(rangeIntersection(visibleDatesJs,rangeToJs(event)));
+            var startDate=getDateElements(event.startTime);
+            var endDate=getDateElements(event.endTime);
+            
+            if(totalTime[event.color]===undefined){
+                totalTime[event.color]=0
+            }
+
+            if(startDate.year==endDate.year&&startDate.month==endDate.month&&startDate.day==endDate.day){
+                var date=getReadableDate(startDate);
+                var color=event.color
+            
+                totalTime['total']+=duration;
+                totalTime[color]+=duration;
+                
+                if(dates[date]===undefined){
+                    dates[date]={}
+                }
+                dates[date].total = (dates[date]['total']||0)+duration;
+                dates[date][color] = (dates[date][color]||0)+duration;
+            }
+          }
+        });
+      }
+    );
+
+    var response='<table width="100%" style="font-size:10px">';
+    for(var key in dates){
+            response+='<tr><th colspan="3">'+key+'</th></tr>';
+            for(var col in dates[key]){
+                if(col!='total'){
+                    response+='<tr style="background:'+col+'"><td align="left">'+millisecondsToHours(dates[key][col])+'</td>';
+                    response+='<td align="right">'+Math.round(100*dates[key][col]/totalTime[col])+"%</td>"
+                    response+='<td align="right">'+Math.round(100*dates[key][col]/totalTime['total'])+"%</td></tr>"
+                }
+            }
+            response+='<tr><td align="left" colspan="2">'+millisecondsToHours(dates[key]['total'])+'</td>';
+            response+='<td align="right">'+Math.round(100*dates[key]['total']/totalTime['total'])+"%</td></tr>"
+    }
+    
+    response+='<tr style="background: #e8eef7"><th>Total</th><th align="right">'+ millisecondsToHours(totalTime['total'])+"</th><th>100%</th></tr>";
+    for(var col in totalTime){
+        if(col!='total'){
+            response+='<tr style="background:'+col+'"><th align="right" colspan="2">'+ millisecondsToHours(totalTime[col])+'</th>';
+            response+='<th>'+Math.round(100*totalTime[col]/totalTime['total'])+'%</th></tr>';
+        }
+    }
+    response+='</table>';
+
+    document.getElementById("main").innerHTML=response;
+    gadgets.window.adjustHeight()
+  }
+
+  gadgets.util.registerOnLoadHandler(
+    function(){
+      var timeRange;
+      function commonCallback(){
+        timeRange&&google.calendar.read.getEvents(
+                      drawGadget,
+                      "selected",
+                      timeRange.startTime,
+                      timeRange.endTime,
+                      {requestedFields:["calendar"]}
+            )
+      }
+      //Callback when change in visible dates
+      google.calendar.subscribeToDates(function(dates){
+                  timeRange=dates;
+                  timeRange.endTime.date++;
+                  visibleDatesJs=rangeToJs(timeRange);
+                  commonCallback()
+                });
+      //Callback when change in data
+      google.calendar.subscribeToDataChange(commonCallback)
+    }
+  );
+  </script>
+]]></Content>
+</Module>
